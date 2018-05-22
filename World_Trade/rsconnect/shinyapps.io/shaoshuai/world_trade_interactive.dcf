@@ -1,0 +1,12 @@
+name: world_trade_interactive
+title: World_Trade_Interactive
+username:
+account: shaoshuai
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 346727
+bundleId: 1385851
+url: https://shaoshuai.shinyapps.io/world_trade_interactive/
+when: 1526953741.42469
+asMultiple: FALSE
+asStatic: FALSE

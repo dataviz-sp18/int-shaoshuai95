@@ -229,3 +229,7 @@ X <- x %>%
   
 X
 ```
+
+###Shiny App
+
+I also create a [Shiny App](https://shaoshuai.shinyapps.io/world_trade_interactive/). Any potential reader can get access to my work if they have the shiny app link. I can share my project with others easily.  
