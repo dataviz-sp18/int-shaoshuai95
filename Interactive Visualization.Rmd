@@ -1,0 +1,231 @@
+---
+title: "Interactive Visualization"
+author: "Shuai Shao"
+date: "5/16/2018"
+output: html_document
+---
+###Introduction
+
+The world trade is one of the most important economic activity in the process of globalization, which aims to benefit both the importer and the importer and the exporter. Recently, the potential [trade war](http://money.cnn.com/2018/05/21/news/economy/us-china-trade-war-deficit/index.html) between the United States and China has aroused the great attention of economists, politicians, and the public. In this assignment, I will present three interactive graphics on USA and China world trade with [plotly](https://plot.ly/#/) package. 
+
+The dataset was downloaded from [World Trade Organization (WTO)](https://www.wto.org/), an intergovernmental organization that regulates international trade. Therefore, WTO is a trustworthy and reliable data source. As China started the [economics reform](https://en.wikipedia.org/wiki/Chinese_economic_reform) in 1978, which has a profound influence on China economics, I will focus on the data after the Year of reform.
+
+First, I will present a general interactive graphic for readers to explore the USA and China imports and exports by themselves. Then, I will genereate an animation to display the development across years. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dplyr)
+library(plotly)
+library(readr)
+library(ggplot2)
+library(ggpubr)
+library(quantmod)
+
+#Import the dataset downloaded from the WTO website
+USA <- read_csv("United_WTO.csv")
+China <- read_csv("China.csv")
+```
+
+```{r tidy the datasets, include=FALSE}
+#USA and China Exports
+USA_X <- filter(USA,Partner_code=="WL" &
+                    Flow_Description=="Exports" &
+                    Indicator_description=="Total merchandise") %>%
+  select(9,11)
+
+China_X <- filter(China,Partner_code=="WL" &
+                        Flow_Description=="Exports" &
+                        Indicator_description=="Total merchandise") %>%
+  select(9,11)
+
+#USA and China Imports
+China_M <- filter(China,Partner_code=="WL" &
+                        Flow_Description=="Imports" &
+                        Indicator_description=="Total merchandise") %>%
+  select(9,11)
+
+USA_M <- filter(USA,Partner_code=="WL" &
+                    Flow_Description=="Imports" &
+                    Indicator_description=="Total merchandise") %>%
+  select(9,11)
+
+#Combine the Imports and Exports data
+all_X <- 
+  USA_X %>% 
+  left_join(China_X,by=c("Year")) %>%
+  select(Year = Year,USA_X = Value.x,China_X = Value.y) %>%
+  filter(Year>1977)
+
+all_M <- 
+  USA_M %>% 
+  left_join(China_M,by=c("Year")) %>%
+  select(Year = Year,USA_M = Value.x,China_M = Value.y) %>%
+  filter(Year>1977)
+
+total_M <- 
+  all_M %>% 
+  select(USA=USA_M,China=China_M,Year=Year) %>%
+  gather('China','USA',key="Country",value="Value") 
+
+total_X <- 
+  all_X %>% 
+  select(USA=USA_X,China=China_X,Year=Year) %>%
+  gather('China','USA',key="Country",value="Value") 
+
+combine <- all_M %>%
+  left_join(all_X, by=c("Year"))
+```
+
+### An interactive grphic of USA and China World Trade
+####Functions
+
+1. Slide the range bar below the graphic to select the years
+2. Double click the legend to show/hide the line
+
+####Justifications
+
+I chose the line graph because it is the best way to present the change across years. And we can make the comparison of variables we are interested in. For instance, we can compare the difference and the trend between the Exports or Imports value within USA or China. Or we can compare the difference and the trend between the countries. 
+
+A range slider can help the readers easily choose the year range that they are interested in and study the development trend within certain years. The **rangeslider** function is more user-friendly than the default zoom in/zoom out function. 
+
+```{r interactive graphic, echo=FALSE}
+p <- plot_ly(combine, x= ~Year) %>%
+  add_lines(y = ~China_M, name = "China Imports", 
+            line = list(color = 'rgb(205, 12, 24)')) %>%
+  add_lines(y = ~China_X, name = "China Exports",
+            line = list(color = 'rgb(22, 96, 167)')) %>%
+  add_lines(y = ~USA_M, name = "USA Imports",
+            line = list(color = 'rgb(205, 12, 24)', dash = 'dash')) %>%
+  add_lines(y = ~USA_X, name = "USA Exports",
+            line = list(color = 'rgb(22, 96, 167)', dash = 'dash')) %>%
+  layout(
+    title = "USA vs. China Imports and Exports",
+    xaxis = list(rangeslider = list(type = "date")),
+
+    yaxis = list(title = "Value (million $)"))
+
+p
+```
+
+### An animation of USA and China World Trade
+
+####Functions
+
+1. Click the **PLAY** button to play the animation
+2. The animation depicts the development of Imports/Exports.
+
+####Descriptions
+
+1. Both China and the United States underwent a great depression at the Year of 2009, when the [Financial Crisis](https://en.wikipedia.org/wiki/Financial_crisis_of_2007%E2%80%932008) made a large influence on the global economics, and another slight recession since the year od 2014.
+
+2. China has surpassed the United States on Exports since the Year of 2007. [Wikipedia](https://en.wikipedia.org/wiki/List_of_exports_of_China) lists out the major cargos of China exports. 
+
+####Justifications
+
+An animation will help us understand the time-series development.
+1. Time-series is a good logic to organize and convey the information.
+2. We can clearly observe the growth rate when the lines move. 
+3. We can clearly observe the surpassing when the lines cross.
+
+```{r echo=FALSE}
+accumulate_by <- function(dat, var) {
+  var <- lazyeval::f_eval(var, dat)
+  lvls <- plotly:::getLevels(var)
+  dats <- lapply(seq_along(lvls), function(x) {
+    cbind(dat[var %in% lvls[seq(1, x)], ], frame = lvls[[x]])
+  })
+  dplyr::bind_rows(dats)
+}
+
+total_M$Year=as.integer(total_M$Year)
+m <- total_M %>%
+  filter(Country %in% c("USA", "China")) %>%
+  accumulate_by(~Year)
+
+M <- m %>%
+  plot_ly(
+    x = ~Year, 
+    y = ~Value,
+    split = ~Country,
+    type = 'scatter',
+    mode = 'lines', 
+    frame = ~frame,
+    line = list(simplyfy = F)
+  ) %>% 
+  layout(
+    xaxis = list(
+      title = "Year",
+      zeroline = F
+    ),
+    yaxis = list(
+      title = "Value (Million USD$)",
+      zeroline = F
+    ),
+    title="USD vs. China Imports"
+  ) %>% 
+  animation_opts(
+    frame = 100, 
+    transition = 0, 
+    redraw = FALSE
+  ) %>%
+  animation_slider(
+    hide = T
+    ) %>%
+  animation_button(x = 1, xanchor = "right", y = 0, yanchor = "bottom"
+  )
+  
+M
+```
+
+### 
+
+```{r echo=FALSE}
+accumulate_by <- function(dat, var) {
+  var <- lazyeval::f_eval(var, dat)
+  lvls <- plotly:::getLevels(var)
+  dats <- lapply(seq_along(lvls), function(x) {
+    cbind(dat[var %in% lvls[seq(1, x)], ], frame = lvls[[x]])
+  })
+  dplyr::bind_rows(dats)
+}
+
+total_M$Year=as.integer(total_M$Year)
+x <- total_X %>%
+  filter(Country %in% c("USA", "China")) %>%
+  accumulate_by(~Year)
+
+X <- x %>%
+  plot_ly(
+    x = ~Year, 
+    y = ~Value,
+    split = ~Country,
+    type = 'scatter',
+    mode = 'lines', 
+    frame = ~frame,
+    line = list(simplyfy = F)
+  ) %>% 
+  layout(
+    xaxis = list(
+      title = "Year",
+      zeroline = F
+    ),
+    yaxis = list(
+      title = "Value (Million USD$)",
+      zeroline = F
+    ),
+    title="USD vs. China Exports (1978~2016)"
+  ) %>% 
+  animation_opts(
+    frame = 100, 
+    transition = 0, 
+    redraw = FALSE
+  ) %>%
+  animation_slider(
+    hide = T
+    ) %>%
+  animation_button(x = 1, xanchor = "right", y = 0, yanchor = "bottom"
+  )
+  
+X
+```
